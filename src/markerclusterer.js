@@ -143,7 +143,7 @@ function MarkerClusterer(map, opt_markers, opt_options) {
    * @type {boolean}
    * @private
    */
-  this.averageCenter_ = false;
+  this.averageCenter_ = true;
 
   if (options['averageCenter'] != undefined) {
     this.averageCenter_ = options['averageCenter'];
@@ -1034,6 +1034,10 @@ function ClusterIcon(cluster, styles, opt_padding) {
   this.sums_ = null;
   this.visible_ = false;
 
+  //--
+  this.origPosition = null;
+  this.markers_ = cluster.getMarkers();
+  this.paths_ = null;
   this.setMap(this.map_);
 }
 
@@ -1061,8 +1065,16 @@ ClusterIcon.prototype.triggerClusterClick = function(event) {
  * @ignore
  */
 ClusterIcon.prototype.onAdd = function() {
+  console.log('...onAdd');
+  this.paths_ = [];
+  this.origPosition = [];
   this.div_ = document.createElement('DIV');
+
   if (this.visible_) {
+    for (var i = 0; i < this.markers_.length; i++) {
+      var omk = this.markers_[i].getPosition();
+      this.origPosition.push(omk);
+    }
     var pos = this.getPosFromLatLng_(this.center_);
     this.div_.style.cssText = this.createCss(pos);
     this.div_.innerHTML = this.sums_.text;
@@ -1070,7 +1082,7 @@ ClusterIcon.prototype.onAdd = function() {
 
   var panes = this.getPanes();
   panes.overlayMouseTarget.appendChild(this.div_);
-
+  //console.log('Panes', panes);
   var that = this;
   google.maps.event.addDomListener(this.div_, 'click', function(event) {
     that.triggerClusterClick(event);
@@ -1104,18 +1116,64 @@ ClusterIcon.prototype.getPosFromLatLng_ = function(latlng) {
  * @ignore
  */
 ClusterIcon.prototype.draw = function() {
+  console.log('...draw');
   if (this.visible_) {
+    this.getCirclePosition();
     var pos = this.getPosFromLatLng_(this.center_);
     this.div_.style.top = pos.y + 'px';
     this.div_.style.left = pos.x + 'px';
   }
 };
 
+ClusterIcon.prototype.clearPath = function() {
+  if (this.paths_) {
+    for (var i = 0; i < this.paths_.length; i++) {
+      this.paths_[i].setMap(null);
+      if (this.markers_[i]) {
+        this.markers_[i].setPosition(this.origPosition[i]);
+      }
+    }
+    this.paths_.length = 0;
+  }
+}
+
+ClusterIcon.prototype.getCirclePosition = function() {
+  console.log('...getCirclePosition')
+  var count = this.markers_.length;
+  //var legLength = ((count + 2) * 23) / (2*Math.PI); //radius
+  //var centerPt = this.getPosFromLatLng_(this.center_); //center
+  var centerPt = this.getProjection().fromLatLngToDivPixel(this.center_); //center
+  var legLength = 50 / (2* Math.sin(Math.PI/count));
+  var angleStep = (2*Math.PI)/(count);
+  //this.paths_ = [];
+  for (var i = 0; i < count; i++) {
+    var angle = Math.PI/2 + i * angleStep;
+
+    var point = new google.maps.Point(
+        centerPt.x + legLength * Math.sin(angle),
+        centerPt.y + legLength * Math.cos(angle));
+
+    var newLatLng = this.getProjection().fromDivPixelToLatLng(point);
+    this.markers_[i].setPosition(newLatLng);
+    this.markers_[i].setMap(this.map_);
+    //-- draw path
+    var path = [this.center_, newLatLng];
+    var line = new google.maps.Polyline({
+      path: path,
+      strokeColor: '#FF0000',
+      strokeOpacity: 1.0,
+      strokeWeight: 1
+    });
+    line.setMap(this.map_);
+    this.paths_.push(line);
+  }
+}
 
 /**
  * Hide the icon.
  */
 ClusterIcon.prototype.hide = function() {
+  console.log('...hide');
   if (this.div_) {
     this.div_.style.display = 'none';
   }
@@ -1127,6 +1185,7 @@ ClusterIcon.prototype.hide = function() {
  * Position and show the icon.
  */
 ClusterIcon.prototype.show = function() {
+  console.log('...show');
   if (this.div_) {
     var pos = this.getPosFromLatLng_(this.center_);
     this.div_.style.cssText = this.createCss(pos);
@@ -1140,6 +1199,10 @@ ClusterIcon.prototype.show = function() {
  * Remove the icon from the map
  */
 ClusterIcon.prototype.remove = function() {
+  console.log('...Removing markers', this.markers_);
+  console.log('...Removing paths', this.paths_);
+  this.clearPath();
+  delete this.paths_;
   this.setMap(null);
 };
 
@@ -1149,6 +1212,7 @@ ClusterIcon.prototype.remove = function() {
  * @ignore
  */
 ClusterIcon.prototype.onRemove = function() {
+  console.log('...onRemove');
   if (this.div_ && this.div_.parentNode) {
     this.hide();
     this.div_.parentNode.removeChild(this.div_);
@@ -1212,9 +1276,9 @@ ClusterIcon.prototype.setCenter = function(center) {
  */
 ClusterIcon.prototype.createCss = function(pos) {
   var style = [];
-  style.push('background-image:url(' + this.url_ + ');');
-  var backgroundPosition = this.backgroundPosition_ ? this.backgroundPosition_ : '0 0';
-  style.push('background-position:' + backgroundPosition + ';');
+  //style.push('background-image:url(' + this.url_ + ');');
+  //var backgroundPosition = this.backgroundPosition_ ? this.backgroundPosition_ : '0 0';
+  //style.push('background-position:' + backgroundPosition + ';');
 
   if (typeof this.anchor_ === 'object') {
     if (typeof this.anchor_[0] === 'number' && this.anchor_[0] > 0 &&

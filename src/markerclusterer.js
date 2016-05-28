@@ -149,6 +149,15 @@ function MarkerClusterer(map, opt_markers, opt_options) {
     this.averageCenter_ = options['averageCenter'];
   }
 
+  /**
+   * @type {boolean}
+   * @private
+   */
+  this.spiderer_ = false;
+  if (options['spiderer'] != undefined) {
+    this.spiderer_ = options['spiderer'];
+  }
+
   this.setupStyles_();
 
   this.setMap(map);
@@ -580,6 +589,13 @@ MarkerClusterer.prototype.setGridSize = function(size) {
   this.gridSize_ = size;
 };
 
+MarkerClusterer.prototype.setSpiderer = function(isSpiderer) {
+  this.spiderer_ = isSpiderer;
+}
+
+MarkerClusterer.prototype.isSpiderer = function() {
+  return this.spiderer_;
+}
 
 /**
  * Returns the min cluster size.
@@ -803,6 +819,7 @@ function Cluster(markerClusterer) {
   this.gridSize_ = markerClusterer.getGridSize();
   this.minClusterSize_ = markerClusterer.getMinClusterSize();
   this.averageCenter_ = markerClusterer.isAverageCenter();
+  this.spiderer_ = markerClusterer.isSpiderer();
   this.center_ = null;
   this.markers_ = [];
   this.bounds_ = null;
@@ -923,6 +940,11 @@ Cluster.prototype.getSize = function() {
   return this.markers_.length;
 };
 
+/**
+ * */
+Cluster.prototype.isSpiderer = function() {
+  return this.spiderer_;
+}
 
 /**
  * Returns the center of the cluster.
@@ -1035,6 +1057,7 @@ function ClusterIcon(cluster, styles, opt_padding) {
   this.visible_ = false;
 
   //--
+  this.spiderer_ = cluster.isSpiderer();
   this.origPosition = null;
   this.markers_ = cluster.getMarkers();
   this.paths_ = null;
@@ -1065,15 +1088,17 @@ ClusterIcon.prototype.triggerClusterClick = function(event) {
  * @ignore
  */
 ClusterIcon.prototype.onAdd = function() {
-  console.log('...onAdd');
   this.paths_ = [];
   this.origPosition = [];
   this.div_ = document.createElement('DIV');
 
   if (this.visible_) {
-    for (var i = 0; i < this.markers_.length; i++) {
-      var omk = this.markers_[i].getPosition();
-      this.origPosition.push(omk);
+    if (this.spiderer_) {
+      //--store original position of marker
+      for (var i = 0; i < this.markers_.length; i++) {
+        var omk = this.markers_[i].getPosition();
+        this.origPosition.push(omk);
+      }
     }
     var pos = this.getPosFromLatLng_(this.center_);
     this.div_.style.cssText = this.createCss(pos);
@@ -1116,9 +1141,10 @@ ClusterIcon.prototype.getPosFromLatLng_ = function(latlng) {
  * @ignore
  */
 ClusterIcon.prototype.draw = function() {
-  console.log('...draw');
   if (this.visible_) {
-    this.getCirclePosition();
+    if (this.spiderer_) {
+      this.getCirclePosition();
+    }
     var pos = this.getPosFromLatLng_(this.center_);
     this.div_.style.top = pos.y + 'px';
     this.div_.style.left = pos.x + 'px';
@@ -1138,10 +1164,8 @@ ClusterIcon.prototype.clearPath = function() {
 }
 
 ClusterIcon.prototype.getCirclePosition = function() {
-  console.log('...getCirclePosition')
   var count = this.markers_.length;
   //var legLength = ((count + 2) * 23) / (2*Math.PI); //radius
-  //var centerPt = this.getPosFromLatLng_(this.center_); //center
   var centerPt = this.getProjection().fromLatLngToDivPixel(this.center_); //center
   var legLength = 50 / (2* Math.sin(Math.PI/count));
   var angleStep = (2*Math.PI)/(count);
@@ -1173,7 +1197,6 @@ ClusterIcon.prototype.getCirclePosition = function() {
  * Hide the icon.
  */
 ClusterIcon.prototype.hide = function() {
-  console.log('...hide');
   if (this.div_) {
     this.div_.style.display = 'none';
   }
@@ -1185,7 +1208,6 @@ ClusterIcon.prototype.hide = function() {
  * Position and show the icon.
  */
 ClusterIcon.prototype.show = function() {
-  console.log('...show');
   if (this.div_) {
     var pos = this.getPosFromLatLng_(this.center_);
     this.div_.style.cssText = this.createCss(pos);
@@ -1199,9 +1221,9 @@ ClusterIcon.prototype.show = function() {
  * Remove the icon from the map
  */
 ClusterIcon.prototype.remove = function() {
-  console.log('...Removing markers', this.markers_);
-  console.log('...Removing paths', this.paths_);
-  this.clearPath();
+  if (this.spiderer_) {
+    this.clearPath();
+  }
   delete this.paths_;
   this.setMap(null);
 };
@@ -1212,7 +1234,6 @@ ClusterIcon.prototype.remove = function() {
  * @ignore
  */
 ClusterIcon.prototype.onRemove = function() {
-  console.log('...onRemove');
   if (this.div_ && this.div_.parentNode) {
     this.hide();
     this.div_.parentNode.removeChild(this.div_);
@@ -1276,10 +1297,11 @@ ClusterIcon.prototype.setCenter = function(center) {
  */
 ClusterIcon.prototype.createCss = function(pos) {
   var style = [];
-  //style.push('background-image:url(' + this.url_ + ');');
-  //var backgroundPosition = this.backgroundPosition_ ? this.backgroundPosition_ : '0 0';
-  //style.push('background-position:' + backgroundPosition + ';');
-
+  if (!this.spiderer_) {
+    style.push('background-image:url(' + this.url_ + ');');
+    var backgroundPosition = this.backgroundPosition_ ? this.backgroundPosition_ : '0 0';
+    style.push('background-position:' + backgroundPosition + ';');
+  }
   if (typeof this.anchor_ === 'object') {
     if (typeof this.anchor_[0] === 'number' && this.anchor_[0] > 0 &&
         this.anchor_[0] < this.height_) {

@@ -11,6 +11,7 @@ Migrated from the [Google Maps JavaScript API utility libraries on Google Code](
 ## Live Demos
 
 [![Marker Clusterer Screenshot](https://googlemaps.github.io/js-marker-clusterer/screenshot.png)](https://googlemaps.github.io/js-marker-clusterer/docs/examples.html)
+[![Marker Clusterer Screenshot](https://googlemaps.github.io/js-marker-clusterer/screenshot1.png)](https://googlemaps.github.io/js-marker-clusterer/docs/examples.html)
 
 [Examples page](https://googlemaps.github.io/js-marker-clusterer/docs/examples.html)
 
